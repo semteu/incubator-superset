@@ -3,7 +3,7 @@ import dt from 'datatables.net-bs';
 import 'datatables.net-bs/css/dataTables.bootstrap.css';
 import dompurify from 'dompurify';
 
-import { fixDataTableBodyHeight, d3TimeFormatPreset } from '../modules/utils';
+import { fixDataTableBodyHeight, d3TimeFormatPreset, d3format } from '../modules/utils';
 import './table.css';
 
 const $ = require('jquery');
@@ -91,7 +91,7 @@ function tableVis(slice, payload) {
         html = `<span class="like-pre">${dompurify.sanitize(val)}</span>`;
       }
       if (isMetric) {
-        html = slice.d3format(c, val);
+        html = d3format(fd.number_format, val);
       }
       if (c[0] === '%') {
         html = d3.format('.3p')(val);
