@@ -634,14 +634,15 @@ class PivotTableViz(BaseViz):
         groupby = self.form_data.get('groupby')
         columns = self.form_data.get('columns')
         metrics = self.form_data.get('metrics')
+        percent_metrics = self.form_data.get('percent_metrics')
         if not columns:
             columns = []
         if not groupby:
             groupby = []
         if not groupby:
             raise Exception(_("Please choose at least one 'Group by' field "))
-        if not metrics:
-            raise Exception(_('Please choose at least one metric'))
+        if not metrics and not percent_metrics:
+            raise Exception(_('Please choose at least one metric or one percent metric'))
         if (
                 any(v in groupby for v in columns) or
                 any(v in columns for v in groupby)):
@@ -653,13 +654,31 @@ class PivotTableViz(BaseViz):
                 self.form_data.get('granularity') == 'all' and
                 DTTM_ALIAS in df):
             del df[DTTM_ALIAS]
+        # Get list of metrics and percent metrics
+        metrics = [self.get_metric_label(m) for m in self.form_data.get('metrics')]
+        percent_metrics = [self.get_metric_label(m) for m in self.form_data.get('percent_metrics')]
         df = df.pivot_table(
             index=self.form_data.get('groupby'),
             columns=self.form_data.get('columns'),
-            values=[self.get_metric_label(m) for m in self.form_data.get('metrics')],
+            values=list(set(metrics).union(set(percent_metrics))), # Add all the metrics from the metrics and the percent metrics
             aggfunc=self.form_data.get('pandas_aggfunc'),
             margins=self.form_data.get('pivot_margins'),
         )
+        # Remove the line which contains the totals if it is present, to compute percentages
+        tmp_df = df.drop('All') if self.form_data.get('pivot_margins') else df
+        # for each percentage metric create a column which will contain the percentages computed
+        for percent_metric in percent_metrics:
+            df['% ' + percent_metric] = tmp_df[percent_metric] / tmp_df[percent_metric].sum() * 100 \
+                if tmp_df[percent_metric].sum() != 0. else 0.
+            if self.form_data.get('pivot_margins'):
+                # if margins was set to true, compute the sum of the percentages of the current percentage metrics
+                df.loc['All', '% ' + percent_metric] = df['% ' + percent_metric].sum()
+
+        # remove some column useless column to render
+        metrics_to_remove = [percent_metric for percent_metric in percent_metrics if percent_metric not in metrics]
+        if len(metrics_to_remove) > 0:
+            df.drop(metrics_to_remove, axis=1, inplace=True)
+
         # Display metrics side by side with each column
         if self.form_data.get('combine_metric'):
             df = df.stack(0).unstack()
