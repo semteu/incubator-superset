@@ -90,7 +90,7 @@ function tableVis(slice, payload) {
       if (typeof (val) === 'string') {
         html = `<span class="like-pre">${dompurify.sanitize(val)}</span>`;
       }
-      if (isMetric) {
+      if (isMetric || typeof(val) === 'number') {
         html = d3format(fd.number_format, val);
       }
       if (c[0] === '%') {
