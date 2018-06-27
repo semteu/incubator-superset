@@ -15,6 +15,7 @@ function tableVis(slice, payload) {
   const fC = d3.format('0,000');
 
   const data = payload.data;
+  const form_data = payload.form_data;
   const fd = slice.formData;
 
   let metrics = fd.metrics || [];
@@ -22,6 +23,8 @@ function tableVis(slice, payload) {
   metrics = metrics.concat((fd.percent_metrics || []).map(m => '%' + m));
   // Removing metrics (aggregates) that are strings
   metrics = metrics.filter(m => !isNaN(data.records[0][m]));
+  // Get the headers of columns use in groupby
+  let groupby = form_data.groupby || []
 
   function col(c) {
     const arr = [];
@@ -90,7 +93,7 @@ function tableVis(slice, payload) {
       if (typeof (val) === 'string') {
         html = `<span class="like-pre">${dompurify.sanitize(val)}</span>`;
       }
-      if (isMetric || typeof(val) === 'number') {
+      if (isMetric || (typeof(val) === 'number' && groupby.indexOf(c) < 0)) {
         html = d3format(fd.number_format, val);
       }
       if (c[0] === '%') {
