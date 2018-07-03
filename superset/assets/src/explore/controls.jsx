@@ -428,12 +428,12 @@ export const controls = {
     description: t('Display total row/column'),
   },
 
-  by_column: {
+  by_line: {
     type: 'CheckboxControl',
-    label: t('By column'),
+    label: t('By line'),
     renderTrigger: false,
     default: false,
-    description: t('Compute percentage metrics by column'),
+    description: t('Compute percentage metrics by line'),
   },
 
   show_markers: {

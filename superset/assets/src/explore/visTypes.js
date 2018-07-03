@@ -972,7 +972,7 @@ export const visTypes = {
           ['groupby', 'columns'],
           ['metrics'],
           ['percent_metrics'],
-          ['by_column'],
+          ['by_line'],
           ['row_limit', null],
         ],
       },
