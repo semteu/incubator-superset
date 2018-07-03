@@ -655,6 +655,10 @@ class PivotTableViz(BaseViz):
                 DTTM_ALIAS in df):
             del df[DTTM_ALIAS]
 
+        # Get the choice of percentage metrics computation (by column / by line)
+        by_line = self.form_data.get('by_line')
+        pivot_margins = self.form_data.get('pivot_margins')
+
         # Get list of metrics and percent metrics
         metrics = [self.get_metric_label(m) for m in self.form_data.get('metrics')]
         percent_metrics = [self.get_metric_label(m) for m in self.form_data.get('percent_metrics')]
@@ -663,26 +667,43 @@ class PivotTableViz(BaseViz):
             columns=self.form_data.get('columns'),
             values=list(set(metrics).union(set(percent_metrics))), # Add all the metrics from the metrics and the percent metrics
             aggfunc=self.form_data.get('pandas_aggfunc'),
-            margins=self.form_data.get('pivot_margins'),
+            margins=pivot_margins,
         )
 
-        # Remove the line which contains the totals if it is present, to compute percentages
-        tmp_df = df.drop('All') if self.form_data.get('pivot_margins') else df
+        if not by_line:  # Case where percent metrics are computed column by column
+            # Remove the line which contains the totals if it is present, to compute percentages
+            tmp_df = df.drop('All') if pivot_margins else df
 
-        # for each percentage metric create a column which will contain the percentages computed
-        columns_lists = tmp_df.columns.values
-        for columns_list in columns_lists:
-            columns_tuple = columns_list if type(columns_list) is tuple else (columns_list, )
-            if columns_tuple[0] in percent_metrics:
-                columns_lists_size = len(columns_tuple)
-                selected_columns = columns_tuple if columns_lists_size > 1 else columns_tuple[0]
-                percentage_column_name = ('% ' + columns_tuple[0], ) + tuple(columns_tuple[1:]) if columns_lists_size > 1 else '%' + columns_tuple[0]
-                df[percentage_column_name] = tmp_df[selected_columns] / tmp_df[selected_columns].sum() * 100 \
-                    if tmp_df[selected_columns].sum() != 0. else 0.
+            # for each percentage metric create a column which will contain the percentages computed
+            columns_lists = tmp_df.columns.values
+            for columns_list in columns_lists:
+                columns_tuple = columns_list if type(columns_list) is tuple else (columns_list,)
+                if columns_tuple[0] in percent_metrics:
+                    columns_lists_size = len(columns_tuple)
+                    selected_columns = columns_tuple if columns_lists_size > 1 else columns_tuple[0]
+                    percentage_column_name = ('% ' + columns_tuple[0],) + tuple(
+                        columns_tuple[1:]) if columns_lists_size > 1 else '%' + columns_tuple[0]
+                    df[percentage_column_name] = tmp_df[selected_columns] / tmp_df[selected_columns].sum() * 100 \
+                        if tmp_df[selected_columns].sum() != 0. else 0.
 
-                # if margins was set to true, compute the sum of the percentages of the current percentage metrics
-                if self.form_data.get('pivot_margins'):
-                    df.loc['All', percentage_column_name] = df[percentage_column_name].sum()
+                    # if margins was set to true, compute the sum of the percentages of the current percentage metrics
+                    if pivot_margins:
+                        df.loc['All', percentage_column_name] = df[percentage_column_name].sum()
+
+        else:   # Case where percent metrics are computed line by line
+            columns_lists = df.columns.values
+            for columns_list in columns_lists:
+                columns_tuple = columns_list if type(columns_list) is tuple else (columns_list,)
+                if columns_tuple[0] in percent_metrics:
+                    if len(columns_tuple) > 1:  # Case where there is multiple level by column
+                        selected_columns = columns_tuple
+                        percentage_column_name = ('% ' + columns_tuple[0],) + tuple(columns_tuple[1:])
+                        denom = df[columns_tuple[0:-1]].sum(axis=1) if not pivot_margins else df[columns_tuple[0]].sum(axis=1) - df[(columns_tuple[0],) + ('All', )]
+                    else:   # Case where there is one level by column
+                        selected_columns = columns_tuple[0]
+                        percentage_column_name = '% ' + columns_tuple[0]
+                        denom = df[list(columns_tuple)].sum(axis=1)
+                    df[percentage_column_name] = df[selected_columns] / denom * 100
 
         # remove some column useless column to render
         metrics_to_remove = [percent_metric for percent_metric in percent_metrics if percent_metric not in metrics]
