@@ -1,6 +1,5 @@
 /* eslint camelcase: 0 */
 import React from 'react';
-import isReact from 'is-react';
 import PropTypes from 'prop-types';
 import { bindActionCreators } from 'redux';
 import { connect } from 'react-redux';
@@ -11,6 +10,7 @@ import ControlRow from './ControlRow';
 import Control from './Control';
 import controls from '../controls';
 import * as actions from '../actions/exploreActions';
+import { t } from '../../locales';
 
 const propTypes = {
   actions: PropTypes.object.isRequired,
@@ -30,7 +30,7 @@ class ControlPanelsContainer extends React.Component {
     this.renderControlPanelSection = this.renderControlPanelSection.bind(this);
   }
   getControlData(controlName) {
-    if (isReact.element(controlName)) {
+    if (React.isValidElement(controlName)) {
       return controlName;
     }
 
@@ -45,7 +45,7 @@ class ControlPanelsContainer extends React.Component {
     }
     // Applying mapStateToProps if needed
     if (mapF) {
-      return Object.assign({}, control, mapF(this.props.exploreState, control));
+      return Object.assign({}, control, mapF(this.props.exploreState, control, this.props.actions));
     }
     return control;
   }
@@ -77,7 +77,7 @@ class ControlPanelsContainer extends React.Component {
             controls={controlSets.map((controlName) => {
               if (!controlName) {
                 return null;
-              } else if (isReact.element(controlName)) {
+              } else if (React.isValidElement(controlName)) {
                 return controlName;
               } else if (ctrls[controlName]) {
                 return (<Control
@@ -130,11 +130,11 @@ class ControlPanelsContainer extends React.Component {
             </Alert>
           }
           <Tabs id="controlSections">
-            <Tab eventKey="query" title="Data">
+            <Tab eventKey="query" title={t('Data')}>
               {querySectionsToRender.map(this.renderControlPanelSection)}
             </Tab>
             {displaySectionsToRender.length > 0 &&
-              <Tab eventKey="display" title="Style">
+              <Tab eventKey="display" title={t('Visual Properties')}>
                 {displaySectionsToRender.map(this.renderControlPanelSection)}
               </Tab>
             }

@@ -1,7 +1,7 @@
-/* global window */
-/* eslint no-undef: 2 */
 import $ from 'jquery';
 import shortid from 'shortid';
+import JSONbig from 'json-bigint';
+
 import { now } from '../modules/dates';
 import { t } from '../locales';
 import {
@@ -9,7 +9,7 @@ import {
   addDangerToast as addDangerToastAction,
   addInfoToast as addInfoToastAction,
 } from '../messageToasts/actions';
-import { COMMON_ERR_MESSAGES } from '../common';
+import { COMMON_ERR_MESSAGES } from '../utils/common';
 
 export const RESET_STATE = 'RESET_STATE';
 export const ADD_QUERY_EDITOR = 'ADD_QUERY_EDITOR';
@@ -125,10 +125,11 @@ export function fetchQueryResults(query) {
     const sqlJsonUrl = `/superset/results/${query.resultsKey}/`;
     $.ajax({
       type: 'GET',
-      dataType: 'json',
+      dataType: 'text',
       url: sqlJsonUrl,
       success(results) {
-        dispatch(querySuccess(query, results));
+        const parsedResults = JSONbig.parse(results);
+        dispatch(querySuccess(query, parsedResults));
       },
       error(err) {
         let msg = t('Failed at retrieving results from the results backend');
@@ -187,7 +188,7 @@ export function runQuery(query) {
         if (msg.indexOf('CSRF token') > 0) {
           msg = COMMON_ERR_MESSAGES.SESSION_TIMED_OUT;
         }
-        dispatch(queryFailed(query, msg, getErrorLink(msg)));
+        dispatch(queryFailed(query, msg, getErrorLink(err)));
       },
     });
   };
@@ -441,7 +442,6 @@ export function popDatasourceQuery(datasourceKey, sql) {
     });
   };
 }
-
 export function createDatasourceStarted() {
   return { type: CREATE_DATASOURCE_STARTED };
 }

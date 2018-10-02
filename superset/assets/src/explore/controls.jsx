@@ -45,11 +45,13 @@ import {
   mainMetric,
 } from '../modules/utils';
 import * as v from './validators';
-import { colorPrimary, ALL_COLOR_SCHEMES, spectrums } from '../modules/colors';
+import { colorPrimary } from '../modules/colors';
 import { defaultViewport } from '../modules/geo';
 import ColumnOption from '../components/ColumnOption';
 import OptionDescription from '../components/OptionDescription';
 import { t } from '../locales';
+import { getAllSchemes } from '../modules/ColorSchemeManager';
+import sequentialSchemes from '../modules/colorSchemes/sequential';
 
 const D3_FORMAT_DOCS = 'D3 format syntax: https://github.com/d3/d3-format';
 
@@ -191,8 +193,9 @@ export const controls = {
     label: t('Datasource'),
     default: null,
     description: null,
-    mapStateToProps: state => ({
+    mapStateToProps: (state, control, actions) => ({
       datasource: state.datasource,
+      onDatasourceSave: actions ? actions.setDatasource : () => {},
     }),
   },
 
@@ -241,6 +244,14 @@ export const controls = {
     renderTrigger: true,
   },
 
+  target_color_picker: {
+    label: t('Target Color'),
+    description: t('Color of the target location'),
+    type: 'ColorPickerControl',
+    default: colorPrimary,
+    renderTrigger: true,
+  },
+
   legend_position: {
     label: t('Legend Position'),
     description: t('Choose the position of the legend'),
@@ -248,6 +259,7 @@ export const controls = {
     clearable: false,
     default: 'tr',
     choices: [
+      [null, 'None'],
       ['tl', 'Top left'],
       ['tr', 'Top right'],
       ['bl', 'Bottom left'],
@@ -324,12 +336,45 @@ export const controls = {
       ['red_yellow_blue', 'red/yellowish/blue'],
       ['brown_white_green', 'brown/white/green'],
       ['purple_white_green', 'purple/white/green'],
+      ['schemeBrBG', 'brown/green'],
+      ['schemePRGn', 'purple/green'],
+      ['schemePiYG', 'pink/green'],
+      ['schemePuOr', 'purple/orange'],
+      ['schemeRdBu', 'red/blue'],
+      ['schemeRdGy', 'red/gray/black'],
+      ['schemeRdYlBu', 'red/yellow/blue'],
+      ['schemeRdYlGn', 'red/yellow/green'],
+      ['schemeSpectral', 'rainbow'],
+      ['schemeBlues', 'd3/blues'],
+      ['schemeGreens', 'd3/greens'],
+      ['schemeGrays', 'd3/grays'],
+      ['schemeOranges', 'd3/oranges'],
+      ['schemePurples', 'd3/purples'],
+      ['schemeReds', 'd3/reds'],
+      ['schemeViridis', 'd3/purple/blue/green/yellow'],
+      ['schemeInferno', 'd3/purple/red/orange/yellow'],
+      ['schemeMagma', 'd3/purple/pink/peach'],
+      ['schemeWarm', 'd3/warm/purple/pink/yellow/green'],
+      ['schemeCool', 'd3/cool/blue/green'],
+      ['schemeCubehelixDefault', 'd3/black/green/brown/pink/blue'],
+      ['schemeBuGn', 'd3/blue/green'],
+      ['schemeBuPu', 'd3/blue/purple'],
+      ['schemeGnBu', 'd3/green/blue'],
+      ['schemeOrRd', 'd3/orange/red'],
+      ['schemePuBuGn', 'd3/purple/blue/green'],
+      ['schemePuBu', 'd3/purple/blue'],
+      ['schemePuRd', 'd3/purple/red'],
+      ['schemeRdPu', 'd3/red/purple'],
+      ['schemeYlGnBu', 'd3/yellow/green/blue'],
+      ['schemeYlGn', 'd3/yellow/green'],
+      ['schemeYlOrBr', 'd3/yellow/brown'],
+      ['schemeYlOrRd', 'd3/yellow/orange/red'],
     ],
     default: 'blue_white_yellow',
     clearable: false,
     description: '',
     renderTrigger: true,
-    schemes: spectrums,
+    schemes: sequentialSchemes,
     isLinear: true,
   },
 
@@ -349,14 +394,15 @@ export const controls = {
 
   horizon_color_scale: {
     type: 'SelectControl',
-    label: t('Horizon Color Scale'),
+    renderTrigger: true,
+    label: t('Value Domain'),
     choices: [
       ['series', 'series'],
       ['overall', 'overall'],
       ['change', 'change'],
     ],
     default: 'series',
-    description: t('Defines how the color are attributed.'),
+    description: t('series: Treat each series independently; overall: All series use the same scale; change: Show changes compared to the first data point in each series'),
   },
 
   canvas_image_rendering: {
@@ -499,6 +545,7 @@ export const controls = {
     ...metric,
     label: t('Color Metric'),
     default: null,
+    validators: [],
     description: t('A metric to use for color'),
   },
   select_country: {
@@ -512,16 +559,21 @@ export const controls = {
       'Egypt',
       'France',
       'Germany',
+      'India',
       'Italy',
       'Portugal',
       'Morocco',
+      'Myanmar',
       'Netherlands',
       'Russia',
       'Singapore',
       'Spain',
+      'Thailand',
+      'Timorleste',
       'Uk',
       'Ukraine',
       'Usa',
+      'Zambia',
     ].map(s => [s, s]),
     description: t('The name of country that Superset should display'),
   },
@@ -643,21 +695,18 @@ export const controls = {
     }),
   },
 
+  filter_nulls: {
+    type: 'CheckboxControl',
+    label: t('Ignore null locations'),
+    default: true,
+    description: t('Whether to ignore locations that are null'),
+  },
+
   geojson: {
     type: 'SelectControl',
     label: t('GeoJson Column'),
     validators: [v.nonEmpty],
     description: t('Select the geojson column'),
-    mapStateToProps: state => ({
-      choices: (state.datasource) ? state.datasource.all_cols : [],
-    }),
-  },
-
-  polygon: {
-    type: 'SelectControl',
-    label: t('Polygon Column'),
-    validators: [v.nonEmpty],
-    description: t('Select the polygon column. Each row should contain JSON.array(N) of [longitude, latitude] points'),
     mapStateToProps: state => ({
       choices: (state.datasource) ? state.datasource.all_cols : [],
     }),
@@ -678,6 +727,7 @@ export const controls = {
     label: t('Stroke Width'),
     validators: [v.integer],
     default: null,
+    renderTrigger: true,
     choices: formatSelectOptions([1, 2, 3, 4, 5]),
   },
 
@@ -793,6 +843,7 @@ export const controls = {
 
   link_length: {
     type: 'SelectControl',
+    renderTrigger: true,
     freeForm: true,
     label: t('Link Length'),
     default: '200',
@@ -802,6 +853,7 @@ export const controls = {
 
   charge: {
     type: 'SelectControl',
+    renderTrigger: true,
     freeForm: true,
     label: t('Charge'),
     default: '-500',
@@ -828,29 +880,30 @@ export const controls = {
     'column in the table. Also note that the ' +
     'filter below is applied against this column or ' +
     'expression'),
-    default: (c) => {
-      if (c.options && c.options.length > 0) {
-        return c.options[0].column_name;
-      }
-      return null;
-    },
+    default: control => control.default,
     clearable: false,
     optionRenderer: c => <ColumnOption column={c} showType />,
     valueRenderer: c => <ColumnOption column={c} />,
     valueKey: 'column_name',
     mapStateToProps: (state) => {
-      const newState = {};
+      const props = {};
       if (state.datasource) {
-        newState.options = state.datasource.columns.filter(c => c.is_dttm);
+        props.options = state.datasource.columns.filter(c => c.is_dttm);
+        props.default = null;
+        if (state.datasource.main_dttm_col) {
+          props.default = state.datasource.main_dttm_col;
+        } else if (props.options && props.options.length > 0) {
+          props.default = props.options[0].column_name;
+        }
       }
-      return newState;
+      return props;
     },
   },
 
   time_grain_sqla: {
     type: 'SelectControl',
     label: t('Time Grain'),
-    default: control => control.choices && control.choices.length ? control.choices[0][0] : null,
+    default: 'P1D',
     description: t('The time granularity for the visualization. This ' +
     'applies a date transformation to alter ' +
     'your time column and defines a new time granularity. ' +
@@ -1018,7 +1071,7 @@ export const controls = {
     isInt: true,
     validators: [v.integer],
     renderTrigger: true,
-    default: 0,
+    default: 2,
     label: t('Cell Padding'),
     description: t('The distance between cells, in pixels'),
   },
@@ -1155,6 +1208,7 @@ export const controls = {
 
   series_height: {
     type: 'SelectControl',
+    renderTrigger: true,
     freeForm: true,
     label: t('Series Height'),
     default: '25',
@@ -1247,7 +1301,8 @@ export const controls = {
     type: 'SelectControl',
     label: t('Rotation'),
     choices: formatSelectOptions(['random', 'flat', 'square']),
-    default: 'random',
+    renderTrigger: true,
+    default: 'flat',
     description: t('Rotation to apply to words in the cloud'),
   },
 
@@ -1295,7 +1350,6 @@ export const controls = {
       'mean',
       'min',
       'max',
-      'median',
       'stdev',
       'var',
     ]),
@@ -1308,6 +1362,7 @@ export const controls = {
     type: 'TextControl',
     isInt: true,
     label: t('Font Size From'),
+    renderTrigger: true,
     default: '20',
     description: t('Font size for the smallest value in the list'),
   },
@@ -1316,6 +1371,7 @@ export const controls = {
     type: 'TextControl',
     isInt: true,
     label: t('Font Size To'),
+    renderTrigger: true,
     default: '150',
     description: t('Font size for the biggest value in the list'),
   },
@@ -1392,6 +1448,7 @@ export const controls = {
     type: 'CheckboxControl',
     label: t('Data Table'),
     default: false,
+    renderTrigger: true,
     description: t('Whether to display the interactive data table'),
   },
 
@@ -1405,10 +1462,10 @@ export const controls = {
 
   table_filter: {
     type: 'CheckboxControl',
-    label: t('Table Filter'),
+    label: t('Emit Filter Events'),
     renderTrigger: true,
     default: false,
-    description: t('Whether to apply filter when table cell is clicked'),
+    description: t('Whether to apply filter when items are clicked'),
   },
 
   align_pn: {
@@ -1443,6 +1500,14 @@ export const controls = {
     description: t('Whether to display the legend (toggles)'),
   },
 
+  send_time_range: {
+    type: 'CheckboxControl',
+    label: t('Propagate'),
+    renderTrigger: true,
+    default: false,
+    description: t('Send range filter events to other charts'),
+  },
+
   show_labels: {
     type: 'CheckboxControl',
     label: t('Show Labels'),
@@ -1475,6 +1540,14 @@ export const controls = {
     renderTrigger: true,
     default: true,
     description: t('Whether to display the trend line'),
+  },
+
+  start_y_axis_at_zero: {
+    type: 'CheckboxControl',
+    label: t('Start y-axis at 0'),
+    renderTrigger: true,
+    default: true,
+    description: t('Start y-axis at zero. Uncheck to start y-axis at minimum value in the data.'),
   },
 
   x_axis_showminmax: {
@@ -1559,6 +1632,7 @@ export const controls = {
       '1 week',
       '28 days',
       '30 days',
+      '52 weeks',
       '1 year',
     ]),
     description: t('Overlay one or more timeseries from a ' +
@@ -1695,6 +1769,17 @@ export const controls = {
     'Between 0 and 1.'),
   },
 
+  opacity: {
+    type: 'SliderControl',
+    label: t('Opacity'),
+    default: 80,
+    step: 1,
+    min: 0,
+    max: 100,
+    renderTrigger: true,
+    description: t('Opacity, expects values between 0 and 100'),
+  },
+
   viewport: {
     type: 'ViewportControl',
     label: t('Viewport'),
@@ -1709,28 +1794,37 @@ export const controls = {
   viewport_zoom: {
     type: 'TextControl',
     label: t('Zoom'),
+    renderTrigger: true,
     isFloat: true,
     default: 11,
     description: t('Zoom level of the map'),
     places: 8,
+    // Viewport zoom shouldn't prompt user to re-run query
+    dontRefreshOnChange: true,
   },
 
   viewport_latitude: {
     type: 'TextControl',
     label: t('Default latitude'),
+    renderTrigger: true,
     default: 37.772123,
     isFloat: true,
     description: t('Latitude of default viewport'),
     places: 8,
+    // Viewport latitude changes shouldn't prompt user to re-run query
+    dontRefreshOnChange: true,
   },
 
   viewport_longitude: {
     type: 'TextControl',
     label: t('Default longitude'),
+    renderTrigger: true,
     default: -122.405293,
     isFloat: true,
     description: t('Longitude of default viewport'),
     places: 8,
+    // Viewport longitude changes shouldn't prompt user to re-run query
+    dontRefreshOnChange: true,
   },
 
   render_while_dragging: {
@@ -1841,6 +1935,13 @@ export const controls = {
     description: t('The number of seconds before expiring the cache'),
   },
 
+  url_params: {
+    type: 'HiddenControl',
+    label: t('URL Parameters'),
+    hidden: true,
+    description: t('Extra parameters for use in jinja templated queries'),
+  },
+
   order_by_entity: {
     type: 'CheckboxControl',
     label: t('Order by entity id'),
@@ -1864,9 +1965,9 @@ export const controls = {
     label: t('Color Scheme'),
     default: 'bnbColors',
     renderTrigger: true,
-    choices: Object.keys(ALL_COLOR_SCHEMES).map(s => ([s, s])),
+    choices: () => Object.keys(getAllSchemes()).map(s => ([s, s])),
     description: t('The color scheme for rendering chart'),
-    schemes: ALL_COLOR_SCHEMES,
+    schemes: () => getAllSchemes(),
   },
 
   significance_level: {
@@ -2032,6 +2133,7 @@ export const controls = {
     choices: [
       ['polyline', 'Polyline'],
       ['json', 'JSON'],
+      ['geohash', 'geohash (square)'],
     ],
   },
 
@@ -2153,7 +2255,7 @@ export const controls = {
     label: t('Filled'),
     renderTrigger: true,
     description: t('Whether to fill the objects'),
-    default: false,
+    default: true,
   },
 
   normalized: {

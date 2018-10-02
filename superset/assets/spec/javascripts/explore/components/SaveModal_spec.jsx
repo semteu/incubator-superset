@@ -3,7 +3,6 @@ import configureStore from 'redux-mock-store';
 import thunk from 'redux-thunk';
 
 import { expect } from 'chai';
-import { describe, it, beforeEach } from 'mocha';
 import { shallow, mount } from 'enzyme';
 import { Modal, Button, Radio } from 'react-bootstrap';
 import sinon from 'sinon';
@@ -192,7 +191,7 @@ describe('SaveModal', () => {
     });
 
     it('calls correct url', () => {
-      const url = '/dashboardmodelviewasync/api/read?_flt_0_owners=' + userID;
+      const url = '/dashboardasync/api/read?_flt_0_owners=' + userID;
       makeRequest();
       expect(ajaxStub.getCall(0).args[0].url).to.be.equal(url);
     });

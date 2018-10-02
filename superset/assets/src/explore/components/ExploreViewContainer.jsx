@@ -15,6 +15,7 @@ import { chartPropShape } from '../../dashboard/util/propShapes';
 import * as exploreActions from '../actions/exploreActions';
 import * as saveModalActions from '../actions/saveModalActions';
 import * as chartActions from '../../chart/chartAction';
+import { isFeatureEnabledCreator } from '../../featureFlags';
 import { Logger, ActionLog, EXPLORE_EVENT_NAMES, LOG_ACTIONS_MOUNT_EXPLORER } from '../../logger';
 
 const propTypes = {
@@ -170,10 +171,15 @@ class ExploreViewContainer extends React.Component {
   addHistory({ isReplace = false, title }) {
     const { payload } = getExploreUrlAndPayload({ formData: this.props.form_data });
     const longUrl = getExploreLongUrl(this.props.form_data);
-    if (isReplace) {
-      history.replaceState(payload, title, longUrl);
-    } else {
-      history.pushState(payload, title, longUrl);
+    try {
+      if (isReplace) {
+        history.replaceState(payload, title, longUrl);
+      } else {
+        history.pushState(payload, title, longUrl);
+      }
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.warn('Failed at altering browser history', payload, title, longUrl);
     }
 
     // it seems some browsers don't support pushState title attribute
@@ -291,17 +297,13 @@ class ExploreViewContainer extends React.Component {
 
 ExploreViewContainer.propTypes = propTypes;
 
-function mapStateToProps({ explore, charts, impressionId }) {
+function mapStateToProps(state) {
+  const { explore, charts, impressionId } = state;
   const form_data = getFormDataFromControls(explore.controls);
-  // fill in additional params stored in form_data but not used by control
-  Object.keys(explore.rawFormData).forEach((key) => {
-    if (form_data[key] === undefined) {
-      form_data[key] = explore.rawFormData[key];
-    }
-  });
   const chartKey = Object.keys(charts)[0];
   const chart = charts[chartKey];
   return {
+    isFeatureEnabled: isFeatureEnabledCreator(state),
     isDatasourceMetaLoading: explore.isDatasourceMetaLoading,
     datasource: explore.datasource,
     datasource_type: explore.datasource.type,

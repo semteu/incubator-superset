@@ -11,7 +11,8 @@ import sqlparse
 from sqlparse.sql import Identifier, IdentifierList
 from sqlparse.tokens import Keyword, Name
 
-RESULT_OPERATIONS = {'UNION', 'INTERSECT', 'EXCEPT'}
+RESULT_OPERATIONS = {'UNION', 'INTERSECT', 'EXCEPT', 'SELECT'}
+ON_KEYWORD = 'ON'
 PRECEDES_TABLE_NAME = {'FROM', 'JOIN', 'DESC', 'DESCRIBE', 'WITH'}
 
 
@@ -40,6 +41,13 @@ class SupersetQuery(object):
 
     def is_select(self):
         return self._parsed[0].get_type() == 'SELECT'
+
+    def is_explain(self):
+        return self.sql.strip().upper().startswith('EXPLAIN')
+
+    def is_readonly(self):
+        """Pessimistic readonly, 100% sure statement won't mutate anything"""
+        return self.is_select() or self.is_explain()
 
     def stripped(self):
         return self.sql.strip(' \t\n;')
@@ -120,8 +128,9 @@ class SupersetQuery(object):
             if not table_name_preceding_token:
                 continue
 
-            if item.ttype in Keyword:
-                if self.__is_result_operation(item.value):
+            if item.ttype in Keyword or item.value == ',':
+                if (self.__is_result_operation(item.value) or
+                        item.value.upper() == ON_KEYWORD):
                     table_name_preceding_token = False
                     continue
                 # FROM clause is over

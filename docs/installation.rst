@@ -4,9 +4,9 @@ Installation & Configuration
 Getting Started
 ---------------
 
-Superset is tested against Python ``2.7`` and Python ``3.4``.
-Airbnb currently uses 2.7.* in production. We do not plan on supporting
-Python ``2.6``.
+Superset is currently tested against Python ``2.7`` and Python ``3.6``.
+Python 3.6 is preferred. Support for Python ``<=3.6`` is planned to get
+phased out.
 
 Cloud-native!
 -------------
@@ -52,6 +52,9 @@ initialize development environment: ::
 
 After several minutes for superset initialization to finish, you can open
 a browser and view `http://localhost:8088` to start your journey.
+
+If you are attempting to build on a Mac and it exits with 137 you need to increase your docker resources.
+OSX instructions: https://docs.docker.com/docker-for-mac/#advanced (Search for memory)
 
 Or if you're curious and want to install superset from bottom up, then go 
 ahead.
@@ -200,7 +203,8 @@ workers this creates a lot of contention and race conditions when defining
 permissions and views.
 
 To alleviate this issue, the automatic updating of permissions can be disabled
-by setting the :envvar:`SUPERSET_UPDATE_PERMS` environment variable to `0`.
+by setting the environment variable
+`SUPERSET_UPDATE_PERMS` environment variable to `0`.
 The value `1` enables it, `0` disables it. Note if undefined the functionality
 is enabled to maintain backwards compatibility.
 
@@ -295,6 +299,9 @@ auth postback endpoint, you can add them to *WTF_CSRF_EXEMPT_LIST*
 
      WTF_CSRF_EXEMPT_LIST = ['']
 
+
+.. _ref_database_deps:
+
 Database dependencies
 ---------------------
 
@@ -347,6 +354,8 @@ Here's a list of some of the recommended packages.
 +---------------+-------------------------------------+-------------------------------------------------+
 |  BigQuery     | ``pip install pybigquery``          | ``bigquery://``                                 |
 +---------------+-------------------------------------+-------------------------------------------------+
+|  Teradata     | ``pip install sqlalchemy-teradata`` | ``teradata://``                                 |
++---------------+-------------------------------------+-------------------------------------------------+
 
 Note that many other database are supported, the main criteria being the
 existence of a functional SqlAlchemy dialect and Python driver. Googling
@@ -364,11 +373,49 @@ Where you need to escape/encode at least the s3_staging_dir, i.e., ::
 
     s3://... -> s3%3A//...
 
-You can also use `PyAthena` library
+You can also use `PyAthena` library(no java required) like this ::
 
     awsathena+rest://{aws_access_key_id}:{aws_secret_access_key}@athena.{region_name}.amazonaws.com/{schema_name}?s3_staging_dir={s3_staging_dir}&...
 
-_(See more details at https://github.com/laughingman7743/PyAthena#sqlalchemy.)_
+See `PyAthena <https://github.com/laughingman7743/PyAthena#sqlalchemy>`_.
+
+Snowflake
+---------
+
+The connection string for Snowflake looks like this ::
+
+    snowflake://{user}:{password}@{account}.{region}/{database}?role={role}&warehouse={warehouse}
+
+The schema is not necessary in the connection string, as it is defined per table/query.
+The role and warehouse can be omitted if defaults are defined for the user, i.e.
+
+    snowflake://{user}:{password}@{account}.{region}/{database}
+
+Make sure the user has privileges to access and use all required
+databases/schemas/tables/views/warehouses, as the Snowflake SQLAlchemy engine does
+not test for user rights during engine creation.
+
+*Note*: At the time of writing, there is a regression in the current stable version (1.1.2) of
+snowflake-sqlalchemy package that causes problems when used with Superset. It is recommended to
+use version 1.1.0 or try a newer version.
+
+See `Snowflake SQLAlchemy <https://github.com/snowflakedb/snowflake-sqlalchemy>`_.
+
+Teradata
+---------
+
+The connection string for Teradata looks like this ::
+
+    teradata://{user}:{password}@{host}
+
+*Note*: Its required to have Teradata ODBC drivers installed and environment variables configured for proper work of sqlalchemy dialect. Teradata ODBC Drivers available here: https://downloads.teradata.com/download/connectivity/odbc-driver/linux
+
+Required environment variables: ::
+
+    export ODBCINI=/.../teradata/client/ODBC_64/odbc.ini  
+    export ODBCINST=/.../teradata/client/ODBC_64/odbcinst.ini 
+
+See `Teradata SQLAlchemy <https://github.com/Teradata/sqlalchemy-teradata>`_.
 
 Caching
 -------
@@ -625,20 +672,12 @@ and run via: ::
 
     celery flower --app=superset.sql_lab:celery_app
 
-Making your own build
+Building from source
 ---------------------
 
-For more advanced users, you may want to build Superset from sources. That
+More advanced users may want to build Superset from sources. That
 would be the case if you fork the project to add features specific to
-your environment.::
-
-    # assuming $SUPERSET_HOME as the root of the repo
-    cd $SUPERSET_HOME/superset/assets
-    yarn
-    yarn run build
-    cd $SUPERSET_HOME
-    python setup.py install
-
+your environment. See `CONTRIBUTING.md <https://github.com/apache/incubator-superset/blob/master/CONTRIBUTING.md#local-development>`_.
 
 Blueprints
 ----------
@@ -683,7 +722,7 @@ Note that it's also possible to implement you own logger by deriving
 
 
 Install Superset with helm in Kubernetes
---------------
+----------------------------------------
 
 You can install Superset into Kubernetes with Helm <https://helm.sh/>. The chart is
 located in ``install/helm``.
@@ -706,7 +745,6 @@ The first step: Configure authorization in Superset ``superset_config.py``.
 .. code-block:: python
 
     AUTH_TYPE = AUTH_OAUTH
-    
     OAUTH_PROVIDERS = [
         {   'name':'egaSSO',
             'token_key':'access_token', # Name of the token in the response of access_token_url
